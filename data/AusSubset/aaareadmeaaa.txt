@@ -1,3 +1,0 @@
-Data from 20040101 - 20150101
-Mirador OMHCHOv003 dataset spatially subset to Australia:
-[50S, 100E, 5S, 170E] 
