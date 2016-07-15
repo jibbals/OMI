@@ -120,7 +120,7 @@ def read_day_avg(day, subsets):
 
 # Dates where we have data:
 #enddate=datetime(2010,1,1)
-enddate=datetime(2010,1,1)
+enddate=datetime(2016,1,1)
 startdate=datetime(2005,1,1)
 ndays=(enddate-startdate).days
 dates=[startdate+timedelta(days=d) for d in range(ndays)]
@@ -150,6 +150,7 @@ for day in dates:
     if day == startdate+timedelta(days=100):
         check=(datetime.now()-st).total_seconds()
         print("~ %3.2f seconds per 100 days"%check)
+        print("~ %4.2f minutes left..."%(check/100./60*ndays))
         
     ymd=day.strftime("%Y%m%d")
     # store them in lists for each subset
