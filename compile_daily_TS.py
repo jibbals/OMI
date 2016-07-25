@@ -46,13 +46,16 @@ def read_omi_swath(path,removerowanomaly=True):
         ## remove missing values and bad flags: 
         # QF: missing<0, suss=1, bad=2
         suss = qf != 0
-        # XQF:
-        if removerowanomaly: suss = suss * (xqf != 0)
         
         hcho[suss]=np.NaN
         lats[suss]=np.NaN
         lons[suss]=np.NaN
-    
+        # XQF:
+        if removerowanomaly: 
+            xsuss=xqf != 0
+            hcho[xsuss]=np.NaN
+            lats[xsuss]=np.NaN
+            lons[xsuss]=np.NaN
     #return hcho, lats, lons, amf, amfg, w, apri, plevs
     return {'HCHO':hcho,'lats':lats,'lons':lons,'HCHO_rsc':hcho_rsc,'qualityflag':qf,'xqf':xqf}
 
@@ -127,8 +130,10 @@ dates=[startdate+timedelta(days=d) for d in range(ndays)]
 #GEOS-Chem grid box: -36, 147.5, -32, 152.5
 #Larger NSW region: -38, 145, -30, 153
 #Sydney region: -35.5, 150, -33.5, 151.5
-subsets=[ [-36, 147.5, -32, 152.5],[-38,145,-30,153],[-35.5, 150, -33.5, 151.5] ]
-outnames=['TS_GC.csv','TS_LargerNSW.csv', 'TS_Sydney.csv']
+# Massive comparison region: -50,110,-10,160
+subsets=[ [-36, 147.5, -32, 152.5],[-38,145,-30,153],[-35.5, 150, -33.5, 151.5] , [-50,110,-10,-160]]
+
+outnames=['TS_GC.csv','TS_LargerNSW.csv', 'TS_Sydney.csv','TS_Aus.csv']
 # subset,outname=subsets[0],outnames[0]
 
 # list of lists
