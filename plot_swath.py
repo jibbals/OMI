@@ -71,7 +71,7 @@ def plot_25_days(start=datetime(2012,1,1)):
     plt.savefig("ExampleDays.png")
 
 
-def examine_single_day(day=datetime(2012,1,14),negs=False):
+def examine_single_day(day=datetime(2012,1,14)):
     ###################
     # Look at 20120114 in more detail...
     ###################
