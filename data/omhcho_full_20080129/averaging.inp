@@ -1,0 +1,104 @@
+# =======================================================
+# Control Input File for the OMI_SAO_AVG gridding program
+# =======================================================
+
+# ---------------------------------------------------------
+# Name of the OMI product to grid. E.g., OMBRO, OMHCHO, etc
+# ---------------------------------------------------------
+OMI ESDT to average
+OMHCHO
+
+# -----------------------------------------------------
+# Name of file with list of input files (absolute path)
+# -----------------------------------------------------
+File name with list of input files
+./filelist.txt
+
+# -----------------------------------
+# Name of output file (absolute path)
+# -----------------------------------
+Output file name
+./20080129g.hdf
+
+# ---------------------------------------------------------
+# Output format ("ascii", "he5"; can be more than one) and,
+# if "he5", HE5 Swath Name
+# ---------------------------------------------------------
+Output format
+he5
+OMHCHO Total Columns
+
+# -----------------------------------------------------------------
+# Output normalization ("T" or "F"); a scale factor is determined
+# automatically, based on the rounded MEDIAN value of the averages.
+# -----------------------------------------------------------------
+Normalize output
+F
+
+# -------------------------------------------------------
+# Maximum quality flag to include (currently  0, 1, or 2)
+# -------------------------------------------------------
+Maximum quality flag to include
+0
+
+# --------------------------
+# Maximum solar zenith angle
+# --------------------------
+Maximum solar zenith angle
+90.0
+
+# -----------------------------
+# Longitude and latitude limits;
+# (1) Lon_min Lon_max dLon
+# (2) Lat_min Lat_max dLat
+# -----------------------------
+Longitude and latitude limits
+-180.0 +180.0  0.2
+ -90.0  +90.0  0.2
+
+# -------------------------------------------------------------
+# Maximum cloud fraction (ignored for some ESDTs, e.g., OMOCLO)
+# Input range: 0.0 <= cfr <= 1.0
+# -------------------------------------------------------------
+Maximum cloud fraction
+0.00 0.40
+
+# -----------------------------------------------------------------
+# Weighting of averages inversely proportional to ground pixel size
+# "T" or "F"
+# -----------------------------------------------------------------
+Ground pixel size weighting
+T
+
+# -------------------------------------------------------------------
+# Weighting of averages inversely proportional to fitting uncertainty
+# "T" or "F" followed by REAL number to use as scale factor to bring
+# uncertainties to ~1 (e.g., 1.0E+13 for OMBRO, 1.0e15 for OMHCHO)
+# ------------------------------------------------------------------
+Uncertainty weighting
+F 1.0e+15
+
+# ----------------------------------------------------
+# Include rebinned spatial zoom granules in averaging?
+# ----------------------------------------------------
+Use rebinned spatial zoom granules
+F
+
+# ---------------------------------------------------
+# Use geometric air mass factor ("T" or "F")
+# For OMOCLO, "F" will product slant column averages.
+# ---------------------------------------------------
+Geometric air mass factor
+T
+
+# -----------------------------------
+# HCHO only: remove background values
+# -----------------------------------
+HCHO remove background
+F
+
+# ---------------------------
+# Select xtrack pixel # range
+# ---------------------------
+xtrack pixel range
+1 60
