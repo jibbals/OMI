@@ -4,6 +4,7 @@ from matplotlib.colors import LogNorm
 from matplotlib import gridspec
 # read hdfeos5 module
 import h5py
+import csv
 import numpy as np
 from mpl_toolkits.basemap import Basemap
 import glob
@@ -14,7 +15,16 @@ _fullswathexample="/home/jesse/Desktop/Repos/OMI/data/omhcho_full_20080129/"
 _datafields='/HDFEOS/SWATHS/OMI Total Column Amount HCHO/Data Fields/'
 _geofields='/HDFEOS/SWATHS/OMI Total Column Amount HCHO/Geolocation Fields/'
 _rscfield=_datafields+'ReferenceSectorCorrectedVerticalColumn'
-_vcfield =_datafields+'ColumnAmount'
+_vcfield =_datafields+'ColumnAmount'        
+
+class Swath:
+    def __init__(self,hcho,lats,lons,flags,xflags,clouds):
+        self.hcho=hcho
+        self.lats=lats
+        self.lons=lons
+        self.flags=flags
+        self.xflags=xflags        
+        self.clouds=clouds
 
 def read_swath(fname, rsc=True, cloudy=0.4, cutlons=[80,200]):
     # open file
@@ -28,8 +38,6 @@ def read_swath(fname, rsc=True, cloudy=0.4, cutlons=[80,200]):
     except KeyError:
         print("Warning: file with missing RSC field, using VC field instead: %s "%fname)
         hcho = fh[_vcfield][:]
-        
-        
     
     # flags and cloud fraction
     qf = fh[_datafields+'MainDataQualityFlag'][:]
@@ -62,7 +70,75 @@ def read_swath(fname, rsc=True, cloudy=0.4, cutlons=[80,200]):
     
     # close file
     fh.close()
-    return hcho,lats,lons
+    
+    return Swath(hcho,lats,lons,qf,xqf,cld)
+
+class Day:
+    def __init__(self, day,rsc=True,cloudy=0.4):
+        pattern="%s*%4dm%02d%02d*.he5"%(_swathesfolder,day.year,day.month,day.day)
+        filenames = glob.glob(pattern) # grab files matching pattern
+        filenames.sort()
+        
+        hcho,lats,lons,flags,xflags,clouds=[],[],[],[],[],[]
+        self.cloudy=cloudy
+        self.day=day
+        self.filenames=filenames
+        
+        for fname in filenames:
+            swath=(read_swath(fname, rsc=rsc,cloudy=cloudy))
+            hcho.append(swath.hcho)
+            lats.append(swath.lats)
+            lons.append(swath.lons)
+            flags.append(swath.flags)
+            xflags.append(swath.xflags)
+            clouds.append(swath.clouds)
+        self.hcho=np.vstack(hcho)
+        self.lats=np.vstack(lats)
+        self.lons=np.vstack(lons)
+        self.flags=np.vstack(flags)
+        self.xflags=np.vstack(xflags)
+        self.clouds=np.vstack(clouds)
+
+def check_flags(day=datetime(2012,1,14)):
+    datac = Day(day)
+    f, axes = plt.subplots(2,2)
+    
+    hcho=datac.hcho
+    logbins=np.logspace(12,19,50)
+    
+    #remove nans
+    filtrd=~np.isnan(datac.hcho)
+    hcho=hcho[filtrd]    
+    # look at plus and minus seperately
+    plus=hcho[hcho > 0]
+    minus=-1*hcho[hcho < 0]
+    
+    # First do plus and minus log bins!
+    ax=axes[0,0]
+    plt.sca(ax)
+    plt.hist(minus,bins=logbins)
+    plt.xscale("log")
+    ax.invert_xaxis()
+    plt.title("Negative hcho")
+    plt.sca(axes[0,1])
+    plt.hist(plus,bins=logbins)
+    plt.xscale("log")
+    plt.title('Positive hcho')
+    
+    # Then do flag histograms
+    flags=datac.flags[filtrd]
+    plt.sca(axes[1,0])
+    plt.hist(flags)
+    plt.title('flags')
+    xflags=datac.xflags[filtrd]
+    plt.sca(axes[1,1])
+    plt.hist(xflags)
+    plt.title('xflags')
+    
+    ymdstr=str(day).split(' ')[0]
+    plt.suptitle(ymdstr, fontsize=25)
+    plt.savefig("DayFlags_%s"%ymdstr)
+    plt.close()
 
 def plot_25_days(start=datetime(2012,1,1),rsc=True,cloudy=0.4):
     # set figure window giving x, y sizes
@@ -109,7 +185,7 @@ def plot_25_days(start=datetime(2012,1,1),rsc=True,cloudy=0.4):
     plt.tight_layout()
     plt.savefig("ExampleDays.png")
     plt.close()
-
+    
 
 def examine_single_day(day=datetime(2012,1,14),cloudy=0.4):
     f=plt.figure(figsize=(13,13))
@@ -263,9 +339,47 @@ def compare_to_non_subset(rsc=True, cloudy=0.4):
     plt.savefig("SubsetVsFull_%s"%ymdstr)
     plt.close()
 
+def plot_time_series():
+    outnames=['TS_Aus.csv','TS_Sydney.csv']
+    colours=['k','m']
+    f = plt.figure(figsize=(16,14))
+    for i,outcsv in enumerate(outnames):
+        with open(outcsv,'r') as inf:
+            reader=csv.reader(inf)
+            data=list(reader)
+            t = [ d[0] for d in data ] # dates
+            h = [ d[1] for d in data ] # old averages
+            hcor = [ d[2] for d in data ] # corrected averages
+            c = [ d[3] for d in data ] # how many entries averaged
+        plt.plot(hcor,'.'+colours[i], label=outcsv)
+        
+    plt.xlabel('Days since '+t[0])
+    plt.ylabel('molecules/cm2')
+    f.suptitle('Average OMI HCHO (daily Gridded V3) VC subset to three regions')
+    plt.ylim([-3e16, 5e16])
+    plt.legend(loc=2)
+    
+    # plot average counts for every 30 days
+    newax=plt.twinx(plt.gca())
+    newax.set_ylabel('good entries')
+    avgs=[]
+    c=np.array(c).astype(float)
+    for i in np.arange(0,len(t),30):
+        mean30=np.mean(c[i:(i+30)])
+        avgs.append(mean30)
+    newax.plot(np.arange(0,len(t),30), np.array(avgs),'cyan',label='Sydney good entries(30 day mean)')
+    newax.set_ylim([20,70])
+    newax.legend(loc=1)
+    savename="TS_AllSubsets.png"
+    print("saving %s"%savename)
+    plt.savefig(savename)
+    plt.close()
+
 if __name__=="__main__":
     print("running")
     #examine_single_day(cloudy=0.1)
     #negative_swath()
     #plot_25_days(rsc=True,cloudy=0.1)
-    compare_to_non_subset()
+    #compare_to_non_subset()
+    #plot_time_series()
+    check_flags()
