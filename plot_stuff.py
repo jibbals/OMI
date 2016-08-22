@@ -190,12 +190,12 @@ def plot_25_days(start=datetime(2012,1,1),rsc=True,cloudy=0.4):
     plt.close()
     
 
-def examine_single_day(day=datetime(2012,1,14),cloudy=0.4):
+def examine_single_day(day=datetime(2012,1,14),cloudy=0.4,rsc=True):
     f,axes=plt.subplots(2,2,figsize=(13,13))
     
     plt.sca(axes[0,0])
     
-    data=Day(day)
+    data=Day(day,rsc=rsc,cloudy=cloudy)
     
     ymdstr="%4d%02d%02d"%(day.year,day.month,day.day)
     # basemap over area of interest
@@ -250,7 +250,7 @@ def examine_single_day(day=datetime(2012,1,14),cloudy=0.4):
     plt.hist(plus,bins=logbins)
     plt.xscale("log")
     plt.title('Positive hcho')
-    plt.savefig("images/Swath_%s"%ymdstr)
+    plt.savefig("images/Swath%s_%s"%(['','rsc'][rsc],ymdstr))
     plt.close()
 
 def negative_swath(day=datetime(2012,1,14)):
@@ -369,7 +369,8 @@ def plot_time_series():
 
 if __name__=="__main__":
     print("running")
-    examine_single_day(cloudy=0.4)
+    examine_single_day(cloudy=0.4, rsc=True)
+    examine_single_day(cloudy=0.4, rsc=False)
     #negative_swath()
     #plot_25_days(rsc=True,cloudy=0.1)
     #compare_to_non_subset()
