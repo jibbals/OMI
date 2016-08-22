@@ -1,7 +1,7 @@
 #libraries (I run in an environment set up by anaconda which includes these packages)
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FormatStrFormatter # for label formatting
 from matplotlib.colors import LogNorm
-from matplotlib import gridspec
 # read hdfeos5 module
 import h5py
 import csv
@@ -23,7 +23,7 @@ class Swath:
         self.lats=lats
         self.lons=lons
         self.flags=flags
-        self.xflags=xflags        
+        self.xflags=xflags
         self.clouds=clouds
 
 def read_swath(fname, rsc=True, cloudy=0.4, cutlons=[80,200]):
@@ -125,20 +125,23 @@ def check_flags(day=datetime(2012,1,14)):
     plt.xscale("log")
     plt.title('Positive hcho')
     
-    # Then do flag histograms
+    # Then do flag checks
     flags=datac.flags[filtrd]
     plt.sca(axes[1,0])
-    plt.hist(flags)
+    plt.scatter(flags,hcho)
     plt.title('flags')
+    
+    axes[1,0].xaxis.set_major_formatter(FormatStrFormatter('%3.2f'))
     xflags=datac.xflags[filtrd]
     plt.sca(axes[1,1])
-    plt.hist(xflags)
+    plt.scatter(xflags,hcho)
     plt.title('xflags')
-    
+    axes[1,1].xaxis.set_major_formatter(FormatStrFormatter('%3.2f'))
     ymdstr=str(day).split(' ')[0]
     plt.suptitle(ymdstr, fontsize=25)
-    plt.savefig("DayFlags_%s"%ymdstr)
+    plt.savefig("images/DayFlags_%s"%ymdstr)
     plt.close()
+    assert np.sum(np.abs(xflags))+np.sum(np.abs(flags)) == 0.0, "Non zero flag somewhere"
 
 def plot_25_days(start=datetime(2012,1,1),rsc=True,cloudy=0.4):
     # set figure window giving x, y sizes
@@ -183,82 +186,71 @@ def plot_25_days(start=datetime(2012,1,1),rsc=True,cloudy=0.4):
     print("minimums")
     print(mins)
     plt.tight_layout()
-    plt.savefig("ExampleDays.png")
+    plt.savefig("images/ExampleDays.png")
     plt.close()
     
 
 def examine_single_day(day=datetime(2012,1,14),cloudy=0.4):
-    f=plt.figure(figsize=(13,13))
+    f,axes=plt.subplots(2,2,figsize=(13,13))
     
-    gs=gridspec.GridSpec(3,2)
-    ax1=f.add_subplot(gs[0,:])
-    plt.sca(ax1)
+    plt.sca(axes[0,0])
     
-    pattern="%s*%4dm%02d%02d*.he5"%(_swathesfolder,day.year,day.month,day.day)
-    filename = glob.glob(pattern) # grab files matching pattern
+    data=Day(day)
     
     ymdstr="%4d%02d%02d"%(day.year,day.month,day.day)
     # basemap over area of interest
-    m=Basemap(llcrnrlat=-50,  urcrnrlat=10,
-              llcrnrlon=90, urcrnrlon=190,
+    m=Basemap(llcrnrlat=-50, urcrnrlat=10, 
+              llcrnrlon=90, urcrnrlon=180,
               resolution='c',projection='merc')
     
-    dayhcho=[]
-    daylats=[]
-    daylons=[]
+    hcho=data.hcho
     
-    for fname in filename:
-        hcho,lats,lons=read_swath(fname,cloudy=cloudy)
-        dayhcho.append(hcho)
-        daylats.append(lats)
-        daylons.append(lons)
-        
-        # basemap grid
-        xi, yi = m(lons,lats)
-        
-        # draw the CO total column onto the map
-        cs = m.pcolormesh(xi,yi,hcho,vmin=1e14, vmax=1e17, norm=LogNorm())
-    cb=m.colorbar(cs,"right",size="5%", pad="2%")
-    cb.set_label('HCHO')
-    m.drawcoastlines()
-    
-    # turn into numpy arrays and remove nans
-    dayhcho=np.vstack(dayhcho)
-    dayhcho=dayhcho[~np.isnan(dayhcho)]
     # look at plus and minus seperately
-    dayhchoplus=dayhcho[dayhcho > 0]
-    dayhchominus=-1*dayhcho[dayhcho<0]
-    daylats=np.vstack(daylats)
-    daylats=daylats[~np.isnan(daylats)]
-    daylons=np.vstack(daylons)
-    daylons=daylons[~np.isnan(daylons)]
+    plus=hcho.copy()
+    plus[hcho < 0]=np.NaN
+    minus=hcho.copy()
+    minus[hcho > 0]=np.NaN
+    minus=-1*minus
     
-    bins=np.logspace(12,19,50)
-    ax2=f.add_subplot(gs[1,0])
-    plt.sca(ax2)
-    # reversed log bin histogram of negative hcho values
-    plt.hist(dayhchominus,bins=bins)
+    nlats=data.lats.copy()
+    nlons=data.lons.copy()
+    plats=data.lats.copy()
+    plons=data.lons.copy()
+    nlats[hcho>0]=np.NaN
+    nlons[hcho>0]=np.NaN
+    plats[hcho<0]=np.NaN
+    plons[hcho<0]=np.NaN
+    nxi,nyi=m(nlons,nlats) # negative lats/lons
+    pxi,pyi=m(plons,plats) # positive lats/lons
+    
+    # draw the negative CO total column onto the map
+    cs = m.pcolormesh(nxi,nyi,minus,vmin=1e14, vmax=1e17, norm=LogNorm())
+    cb=m.colorbar(cs,"right",size="5%", pad="2%")
+    cb.set_label('molecules/cm2')
+    m.drawcoastlines()
+    plt.title('Negative')
+    
+    plt.sca(axes[0,1])
+    cs = m.pcolormesh(pxi,pyi,plus,vmin=1e14,vmax=1e17, norm=LogNorm())
+    #cb=m.colorbar(cs,"right",size="5%", pad="2%")
+    #cb.set_label('molecules/cm2')
+    m.drawcoastlines()
+    plt.title('Positive')
+    
+    # now do plus and minus log bins!
+    minus=-1*hcho[hcho < 0]
+    plus=hcho[hcho>0]
+    logbins=np.logspace(12,19,50)
+    plt.sca(axes[1,0])
+    plt.hist(minus,bins=logbins)
     plt.xscale("log")
-    ax2.invert_xaxis()
-    plt.title("Negative entries")
-    
-    ax3=f.add_subplot(gs[1,1])
-    plt.sca(ax3)
-    plt.hist(dayhchoplus,bins=bins)
+    axes[1,0].invert_xaxis()
+    plt.title("Negative hcho")
+    plt.sca(axes[1,1])
+    plt.hist(plus,bins=logbins)
     plt.xscale("log")
-    plt.title('Positive entries')
-    
-    ax4=f.add_subplot(gs[2,0])
-    plt.sca(ax4)
-    plt.hist(daylats,bins=30)
-    plt.title('latitude hist')
-    
-    ax5=f.add_subplot(gs[2,1])
-    plt.sca(ax5)
-    plt.hist(daylons,bins=30)
-    plt.title('longitude hist')
-    plt.suptitle(ymdstr,fontsize=25)
-    plt.savefig("Swath_%s"%ymdstr)
+    plt.title('Positive hcho')
+    plt.savefig("images/Swath_%s"%ymdstr)
     plt.close()
 
 def negative_swath(day=datetime(2012,1,14)):
@@ -302,7 +294,7 @@ def negative_swath(day=datetime(2012,1,14)):
     
     
     plt.suptitle(ymdstr,fontsize=25)
-    plt.savefig("NegativeSwath_%s"%ymdstr)
+    plt.savefig("images/NegativeSwath_%s"%ymdstr)
     plt.close()
 
 def compare_to_non_subset(rsc=True, cloudy=0.4):
@@ -336,7 +328,7 @@ def compare_to_non_subset(rsc=True, cloudy=0.4):
     
     
     plt.suptitle(ymdstr,fontsize=25)
-    plt.savefig("SubsetVsFull_%s"%ymdstr)
+    plt.savefig("images/SubsetVsFull_%s"%ymdstr)
     plt.close()
 
 def plot_time_series():
@@ -370,16 +362,16 @@ def plot_time_series():
     newax.plot(np.arange(0,len(t),30), np.array(avgs),'cyan',label='Sydney good entries(30 day mean)')
     newax.set_ylim([20,70])
     newax.legend(loc=1)
-    savename="TS_AllSubsets.png"
+    savename="images/TS_AllSubsets.png"
     print("saving %s"%savename)
     plt.savefig(savename)
     plt.close()
 
 if __name__=="__main__":
     print("running")
-    #examine_single_day(cloudy=0.1)
+    examine_single_day(cloudy=0.4)
     #negative_swath()
     #plot_25_days(rsc=True,cloudy=0.1)
     #compare_to_non_subset()
     #plot_time_series()
-    check_flags()
+    #check_flags()
