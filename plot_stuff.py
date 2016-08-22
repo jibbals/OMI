@@ -74,7 +74,7 @@ def read_swath(fname, rsc=True, cloudy=0.4, cutlons=[80,200]):
     return Swath(hcho,lats,lons,qf,xqf,cld)
 
 class Day:
-    def __init__(self, day,rsc=True,cloudy=0.4):
+    def __init__(self, day,rsc=True,cloudy=0.4,verbose=False):
         pattern="%s*%4dm%02d%02d*.he5"%(_swathesfolder,day.year,day.month,day.day)
         filenames = glob.glob(pattern) # grab files matching pattern
         filenames.sort()
@@ -86,6 +86,10 @@ class Day:
         
         for fname in filenames:
             swath=(read_swath(fname, rsc=rsc,cloudy=cloudy))
+            if verbose:
+                print("Reading %s"%fname)
+                print("Shape: "+str(np.shape(swath.hcho)))
+                print("non-nans: %d"%np.sum(np.isnan(swath.hcho)))
             hcho.append(swath.hcho)
             lats.append(swath.lats)
             lons.append(swath.lons)
@@ -191,21 +195,19 @@ def plot_25_days(start=datetime(2012,1,1),rsc=True,cloudy=0.4):
     
 
 def examine_single_day(day=datetime(2012,1,14),cloudy=0.4,rsc=True):
+    
     f,axes=plt.subplots(2,2,figsize=(13,13))
-    
     plt.sca(axes[0,0])
-    
-    data=Day(day,rsc=rsc,cloudy=cloudy)
-    
+    data=Day(day,rsc=rsc,cloudy=cloudy,verbose=True)
     ymdstr="%4d%02d%02d"%(day.year,day.month,day.day)
+    
     # basemap over area of interest
     m=Basemap(llcrnrlat=-50, urcrnrlat=10, 
               llcrnrlon=90, urcrnrlon=180,
               resolution='c',projection='merc')
     
-    hcho=data.hcho
-    
     # look at plus and minus seperately
+    hcho=data.hcho
     plus=hcho.copy()
     plus[hcho < 0]=np.NaN
     minus=hcho.copy()
@@ -222,25 +224,27 @@ def examine_single_day(day=datetime(2012,1,14),cloudy=0.4,rsc=True):
     plons[hcho<0]=np.NaN
     nxi,nyi=m(nlons,nlats) # negative lats/lons
     pxi,pyi=m(plons,plats) # positive lats/lons
+    vmin,vmax=1e14,1e17
     
     # draw the negative CO total column onto the map
-    cs = m.pcolormesh(nxi,nyi,minus,vmin=1e14, vmax=1e17, norm=LogNorm())
+    cs = m.pcolormesh(nxi,nyi,minus,vmin=vmin,vmax=vmax, norm=LogNorm())
+    cs.cmap.set_over('fuchsia')
+    cs.set_clim(vmin, vmax)
     cb=m.colorbar(cs,"right",size="5%", pad="2%")
     cb.set_label('molecules/cm2')
     m.drawcoastlines()
     plt.title('Negative')
     
+    # draw positive HCHO without a colourbar
     plt.sca(axes[0,1])
-    cs = m.pcolormesh(pxi,pyi,plus,vmin=1e14,vmax=1e17, norm=LogNorm())
-    #cb=m.colorbar(cs,"right",size="5%", pad="2%")
-    #cb.set_label('molecules/cm2')
+    cs = m.pcolormesh(pxi,pyi,plus,vmin=vmin,vmax=vmax, norm=LogNorm())
     m.drawcoastlines()
     plt.title('Positive')
     
     # now do plus and minus log bins!
     minus=-1*hcho[hcho < 0]
     plus=hcho[hcho>0]
-    logbins=np.logspace(12,19,50)
+    logbins=np.logspace(12,20,50)
     plt.sca(axes[1,0])
     plt.hist(minus,bins=logbins)
     plt.xscale("log")
@@ -250,6 +254,7 @@ def examine_single_day(day=datetime(2012,1,14),cloudy=0.4,rsc=True):
     plt.hist(plus,bins=logbins)
     plt.xscale("log")
     plt.title('Positive hcho')
+    plt.suptitle('OMI HCHO %s \n cloudfrac>%3.1f removed, non zero qflags and xtrackflags removed \n %s'%(['ColumnAmount','ReferenceSectorCorrected'][rsc], cloudy,ymdstr),fontsize=20)
     plt.savefig("images/Swath%s_%s"%(['','rsc'][rsc],ymdstr))
     plt.close()
 
@@ -371,6 +376,8 @@ if __name__=="__main__":
     print("running")
     examine_single_day(cloudy=0.4, rsc=True)
     examine_single_day(cloudy=0.4, rsc=False)
+    examine_single_day(day=datetime(2012,1,18),rsc=False,cloudy=0.4)
+    examine_single_day(day=datetime(2013,3,18),rsc=False,cloudy=0.3)
     #negative_swath()
     #plot_25_days(rsc=True,cloudy=0.1)
     #compare_to_non_subset()
