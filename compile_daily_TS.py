@@ -14,10 +14,16 @@ from glob import glob
 _swathesfolder="/media/jesse/My Book/jwg366/OMI/OMHCHOSubset/"
 #_swathesfolder="data/"
 
-def read_omi_swath(path,removerowanomaly=True, cloudy=0.4):
+def read_omi_swath(path,removerowanomaly=True, cloudy=0.4, screen=[-0.5e16, 1e17], szamax=60):
     '''
     Read info from a single swath file
     NANify entries with main quality flag not equal to zero
+    Filtering: remove pixels with following properties
+        cloud frac > cloudy
+        Col Density outside screen range
+        solar zenith angle > szamax
+        quality flag not 0
+        xtrack flag not 0
     Returns:
         (hcho, hcho_corrected, lats, lons)
     '''
@@ -44,6 +50,7 @@ def read_omi_swath(path,removerowanomaly=True, cloudy=0.4):
         qf      = in_f[field_qf].value       #
         xqf     = in_f[field_xqf].value      #
         cld     = in_f[field_clouds].value   #
+        # TODO: read in sza field
         
         ## remove missing values and bad flags: 
         # QF: missing<0, suss=1, bad=2
@@ -64,6 +71,16 @@ def read_omi_swath(path,removerowanomaly=True, cloudy=0.4):
         hcho[rmcloud]=np.NaN
         lats[rmcloud]=np.NaN
         lons[rmcloud]=np.NaN
+        
+        # remove range outside of screen values
+        if screen is not None:
+            rm = (hcho < screen[0]) * (hcho > screen[1])
+        hcho[rm]=np.NaN
+        lats[rm]=np.NaN
+        lons[rm]=np.NaN
+        
+        # TODO: Remove sza > szamax pixels
+        
     #return hcho, lats, lons, amf, amfg, w, apri, plevs
     return {'HCHO':hcho,'lats':lats,'lons':lons,'HCHO_rsc':hcho_rsc,'qualityflag':qf,'xqf':xqf}
 
