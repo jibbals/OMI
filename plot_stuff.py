@@ -49,9 +49,12 @@ def read_swath(fname, rsc=True, cloudy=0.4, cutlons=[80,200]):
     cld = fh[_datafields+'AMFCloudFraction'][:] > cloudy
     
     # remove non optimal flagged data
-    hcho[qf+xqf != 0]=np.NaN
-    lons[qf+xqf != 0]=np.NaN
-    lats[qf+xqf != 0]=np.NaN
+    hcho[qf != 0]=np.NaN
+    hcho[xqf != 0]=np.NaN
+    lons[qf != 0]=np.NaN
+    lons[xqf != 0]=np.NaN
+    lats[qf != 0]=np.NaN
+    lats[xqf != 0]=np.NaN
     
     # Make sure lons don't jump to -180
     lons[lons<0]=lons[lons<0]+360.0
@@ -336,7 +339,7 @@ def compare_to_non_subset(rsc=True, cloudy=0.4):
     plt.savefig("images/SubsetVsFull_%s"%ymdstr)
     plt.close()
 
-def plot_time_series():
+def plot_time_series(corrected=False):
     outnames=['TS_Aus.csv','TS_Sydney.csv']
     colours=['k','m']
     f = plt.figure(figsize=(16,14))
@@ -345,15 +348,19 @@ def plot_time_series():
             reader=csv.reader(inf)
             data=list(reader)
             t = [ d[0] for d in data ] # dates
-            h = [ d[1] for d in data ] # old averages
-            hcor = [ d[2] for d in data ] # corrected averages
-            c = [ d[3] for d in data ] # how many entries averaged
-        plt.plot(hcor,'.'+colours[i], label=outcsv)
+            h = [ float(d[1]) for d in data ] # old averages
+            hcor = [ float(d[2]) for d in data ] # corrected averages
+            c = [ int(float(d[3])) for d in data ] # how many entries averaged
+            if corrected:
+                plt.plot(hcor,'.'+colours[i], label=outcsv)
+            else:
+                plt.plot(h,'.'+colours[i], label=outcsv)
+                print("Minimum entry:%4.2e"%np.nanmin(h))
         
     plt.xlabel('Days since '+t[0])
     plt.ylabel('molecules/cm2')
     f.suptitle('Average OMI HCHO (daily Gridded V3) VC subset to three regions')
-    plt.ylim([-3e16, 5e16])
+    plt.ylim([-1e16, 6e16])
     plt.legend(loc=2)
     
     # plot average counts for every 30 days
@@ -365,7 +372,7 @@ def plot_time_series():
         mean30=np.mean(c[i:(i+30)])
         avgs.append(mean30)
     newax.plot(np.arange(0,len(t),30), np.array(avgs),'cyan',label='Sydney good entries(30 day mean)')
-    newax.set_ylim([20,70])
+    newax.set_ylim([0,60])
     newax.legend(loc=1)
     savename="images/TS_AllSubsets.png"
     print("saving %s"%savename)
@@ -374,12 +381,12 @@ def plot_time_series():
 
 if __name__=="__main__":
     print("running")
-    examine_single_day(cloudy=0.4, rsc=True)
-    examine_single_day(cloudy=0.4, rsc=False)
-    examine_single_day(day=datetime(2012,1,18),rsc=False,cloudy=0.4)
-    examine_single_day(day=datetime(2013,3,18),rsc=False,cloudy=0.3)
+    #examine_single_day(cloudy=0.4, rsc=True)
+    #examine_single_day(cloudy=0.4, rsc=False)
+    #examine_single_day(day=datetime(2008,1,8),rsc=False,cloudy=0.4)
+    #examine_single_day(day=datetime(2009,6,19),rsc=False,cloudy=0.3)
     #negative_swath()
     #plot_25_days(rsc=True,cloudy=0.1)
     #compare_to_non_subset()
-    #plot_time_series()
+    plot_time_series()
     #check_flags()

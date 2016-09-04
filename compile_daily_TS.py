@@ -39,6 +39,7 @@ def read_omi_swath(path,removerowanomaly=True, cloudy=0.4, screen=[-0.5e16, 1e17
     field_xqf   = geofields +'XtrackQualityFlags'
     field_lon   = geofields +'Longitude'
     field_lat   = geofields +'Latitude'
+    field_sza   = geofields +'SolarZenithAngle'
     
     ## read in file:
     with h5py.File(path,'r') as in_f:
@@ -50,7 +51,7 @@ def read_omi_swath(path,removerowanomaly=True, cloudy=0.4, screen=[-0.5e16, 1e17
         qf      = in_f[field_qf].value       #
         xqf     = in_f[field_xqf].value      #
         cld     = in_f[field_clouds].value   #
-        # TODO: read in sza field
+        sza     = in_f[field_sza].value      #
         
         ## remove missing values and bad flags: 
         # QF: missing<0, suss=1, bad=2
@@ -74,19 +75,20 @@ def read_omi_swath(path,removerowanomaly=True, cloudy=0.4, screen=[-0.5e16, 1e17
         
         # remove range outside of screen values
         if screen is not None:
-            rm = (hcho < screen[0]) * (hcho > screen[1])
+            rm = (hcho < screen[0]) + (hcho > screen[1])
         hcho[rm]=np.NaN
         lats[rm]=np.NaN
         lons[rm]=np.NaN
         
         # TODO: Remove sza > szamax pixels
+        if szamax is not None:
+            rm = (sza > szamax)
+        hcho[rm]=np.NaN
+        lats[rm]=np.NaN
+        lons[rm]=np.NaN
         
     #return hcho, lats, lons, amf, amfg, w, apri, plevs
-    return {'HCHO':hcho,'lats':lats,'lons':lons,'HCHO_rsc':hcho_rsc,'qualityflag':qf,'xqf':xqf}
-
-# checking xqf flag
-fpath=glob('data/*2009m1230t0156*')[0]
-swath=read_omi_swath(fpath)
+    return {'HCHO':hcho,'lats':lats,'lons':lons,'HCHO_rsc':hcho_rsc,'qualityflag':qf,'xqf':xqf,'sza':sza}
 
 def read_day_avg(day, subsets):
     '''
