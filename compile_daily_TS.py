@@ -60,32 +60,39 @@ def read_omi_swath(path,removerowanomaly=True, cloudy=0.4, screen=[-0.5e16, 1e17
         hcho[suss]=np.NaN
         lats[suss]=np.NaN
         lons[suss]=np.NaN
+        hcho_rsc[suss]=np.NaN
+        
         # XQF:
         if removerowanomaly: 
             xsuss=(xqf != 0)
             hcho[xsuss]=np.NaN
             lats[xsuss]=np.NaN
             lons[xsuss]=np.NaN
+            hcho_rsc[xsuss]=np.NaN
         
         # remove cloudiness
         rmcloud=cld > cloudy
         hcho[rmcloud]=np.NaN
         lats[rmcloud]=np.NaN
         lons[rmcloud]=np.NaN
+        hcho_rsc[rmcloud]=np.NaN
         
         # remove range outside of screen values
         if screen is not None:
             rm = (hcho < screen[0]) + (hcho > screen[1])
-        hcho[rm]=np.NaN
-        lats[rm]=np.NaN
-        lons[rm]=np.NaN
+            rmrsc= (hcho_rsc < screen[0]) + (hcho_rsc > screen[1])
+            hcho[rm]=np.NaN
+            lats[rm]=np.NaN
+            lons[rm]=np.NaN
+            hcho_rsc[rmrsc]=np.NaN
         
         # TODO: Remove sza > szamax pixels
         if szamax is not None:
             rm = (sza > szamax)
-        hcho[rm]=np.NaN
-        lats[rm]=np.NaN
-        lons[rm]=np.NaN
+            hcho[rm]=np.NaN
+            lats[rm]=np.NaN
+            lons[rm]=np.NaN
+            hcho_rsc[rm]=np.NaN
         
     #return hcho, lats, lons, amf, amfg, w, apri, plevs
     return {'HCHO':hcho,'lats':lats,'lons':lons,'HCHO_rsc':hcho_rsc,'qualityflag':qf,'xqf':xqf,'sza':sza}
