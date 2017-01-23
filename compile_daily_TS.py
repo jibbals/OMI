@@ -1,5 +1,3 @@
-
-
 # read hdfeos5 module
 import h5py
 
@@ -11,7 +9,7 @@ import numpy as np
 from datetime import datetime, timedelta
 from glob import glob
 
-_swathesfolder="/media/jesse/My Book/jwg366/OMI/OMHCHOSubset/"
+_swathesfolder="/media/jesse/My Book/jwg366/Satellite/Aura/OMI/OMHCHOSubset"
 #_swathesfolder="data/"
 
 def read_omi_swath(path,removerowanomaly=True, cloudy=0.4, screen=[-0.5e16, 1e17], szamax=60):
@@ -86,7 +84,6 @@ def read_omi_swath(path,removerowanomaly=True, cloudy=0.4, screen=[-0.5e16, 1e17
             lons[rm]=np.NaN
             hcho_rsc[rmrsc]=np.NaN
         
-        # TODO: Remove sza > szamax pixels
         if szamax is not None:
             rm = (sza > szamax)
             hcho[rm]=np.NaN
@@ -156,7 +153,6 @@ def read_day_avg(day, subsets):
     return (out_avg, out_avg_corr, out_counts)
 
 # Dates where we have data:
-#enddate=datetime(2010,1,1)
 enddate=datetime(2016,1,1)
 startdate=datetime(2005,1,1)
 ndays=(enddate-startdate).days
@@ -165,10 +161,18 @@ dates=[startdate+timedelta(days=d) for d in range(ndays)]
 #Larger NSW region: -38, 145, -30, 153
 #Sydney region: -35.5, 150, -33.5, 151.5
 # Massive comparison region: -50,110,-10,160
-subsets=[ [-36, 147.5, -32, 152.5],[-38,145,-30,153],[-35.5, 150, -33.5, 151.5] , [-50,110,-10, 160]]
 
-outnames=['TS_GC.csv','TS_LargerNSW.csv', 'TS_Sydney.csv','TS_Aus.csv']
+#subsets=[ [-36, 147.5, -32, 152.5],[-38,145,-30,153],[-35.5, 150, -33.5, 151.5] , [-50,110,-10, 160]]
+#outnames=['TS_GC.csv','TS_LargerNSW.csv', 'TS_Sydney.csv','TS_Aus.csv']
 # subset,outname=subsets[0],outnames[0]
+
+# second set of subsets for Kaitlyn Jan2017
+# 1. A box like the South Coast region, but with Sydney excluded (what’s the resolution of the raw product? I can give you lat/lon based on that resolution but it’ll be around -34,150,-33.5,151)
+#2. The South Coast region but only ocean cells (Jenny said that this should be easy for you to filter?)
+#3. The South Coast region but with only land cells
+#4. Like #1 but with only ocean cells
+#5. Like #1 but with only land cells
+
 
 # list of lists
 n_subs=len(subsets)
