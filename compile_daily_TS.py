@@ -121,7 +121,7 @@ def read_omi_swath(path,removerowanomaly=True, cloudy=0.4, screen=[-0.5e16, 1e17
     #return hcho, lats, lons, amf, amfg, w, apri, plevs
     return {'HCHO':hcho,'lats':lats,'lons':lons,'HCHO_rsc':hcho_rsc,'qualityflag':qf,'xqf':xqf,'sza':sza}
 
-def read_day_avg(day, subsets, mask_ocean=False):
+def read_day_avg(day, subsets, mask_ocean=False, mask_land=False):
     '''
     Read the average HCHO from a days worth of swathes
     molecules/cm2
@@ -148,7 +148,7 @@ def read_day_avg(day, subsets, mask_ocean=False):
     #print("reading %d swaths like %s"%(len(swaths),pattern))
     # for each swath, grab the entries within our lat/lon bounds
     for fpath in swaths:
-        swath=read_omi_swath(fpath,mask_ocean=mask_ocean)
+        swath=read_omi_swath(fpath,mask_ocean=mask_ocean, mask_land=mask_land)
         # rows x sensors
         # I x 60
         hcho=swath['HCHO']
