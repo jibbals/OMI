@@ -7,12 +7,27 @@ import csv
 # use maths and dates, and glob for files list
 import numpy as np
 from datetime import datetime, timedelta
+from mpl_toolkits.basemap import maskoceans
 from glob import glob
 
 _swathesfolder="/media/jesse/My Book/jwg366/Satellite/Aura/OMI/OMHCHOSubset"
 #_swathesfolder="data/"
-
-def read_omi_swath(path,removerowanomaly=True, cloudy=0.4, screen=[-0.5e16, 1e17], szamax=60):
+def get_ocean_mask(lats,lons):
+    '''
+    returns mask with true's over oceanic squares (and nans)
+    '''
+    # set nans to an ocean square
+    nans=np.isnan(lats)
+    lat=np.copy(lats)
+    lat[nans] = -50
+    lon=np.copy(lons)
+    lon[nans] = 100
+    # get mask of ocean squares
+    mask=maskoceans(lon,lat,lon,inlands=False).mask
+    mask[nans] = True
+    return mask
+    
+def read_omi_swath(path,removerowanomaly=True, cloudy=0.4, screen=[-0.5e16, 1e17], szamax=60, mask_ocean=False, mask_land=False):
     '''
     Read info from a single swath file
     NANify entries with main quality flag not equal to zero
@@ -91,10 +106,22 @@ def read_omi_swath(path,removerowanomaly=True, cloudy=0.4, screen=[-0.5e16, 1e17
             lons[rm]=np.NaN
             hcho_rsc[rm]=np.NaN
         
+        if mask_ocean:
+            mask=get_ocean_mask(lats,lons)
+            hcho[mask]=np.NaN
+            lats[mask]=np.NaN
+            lons[mask]=np.NaN
+            hcho_rsc[mask]=np.NaN
+        if mask_land:
+            mask=np.logical_not(get_ocean_mask(lats,lons))
+            hcho[mask]=np.NaN
+            lats[mask]=np.NaN
+            lons[mask]=np.NaN
+            hcho_rsc[mask]=np.NaN
     #return hcho, lats, lons, amf, amfg, w, apri, plevs
     return {'HCHO':hcho,'lats':lats,'lons':lons,'HCHO_rsc':hcho_rsc,'qualityflag':qf,'xqf':xqf,'sza':sza}
 
-def read_day_avg(day, subsets):
+def read_day_avg(day, subsets, mask_ocean=False):
     '''
     Read the average HCHO from a days worth of swathes
     molecules/cm2
@@ -121,7 +148,7 @@ def read_day_avg(day, subsets):
     #print("reading %d swaths like %s"%(len(swaths),pattern))
     # for each swath, grab the entries within our lat/lon bounds
     for fpath in swaths:
-        swath=read_omi_swath(fpath)
+        swath=read_omi_swath(fpath,mask_ocean=mask_ocean)
         # rows x sensors
         # I x 60
         hcho=swath['HCHO']
@@ -152,63 +179,64 @@ def read_day_avg(day, subsets):
             out_avg_corr[si]=hcho_rscs[si]/float(hrsccount[si])
     return (out_avg, out_avg_corr, out_counts)
 
-# Dates where we have data:
-enddate=datetime(2016,1,1)
-startdate=datetime(2005,1,1)
-ndays=(enddate-startdate).days
-dates=[startdate+timedelta(days=d) for d in range(ndays)]
-#GEOS-Chem grid box: -36, 147.5, -32, 152.5
-#Larger NSW region: -38, 145, -30, 153
-#Sydney region: -35.5, 150, -33.5, 151.5
-# Massive comparison region: -50,110,-10,160
-
-#subsets=[ [-36, 147.5, -32, 152.5],[-38,145,-30,153],[-35.5, 150, -33.5, 151.5] , [-50,110,-10, 160]]
-#outnames=['TS_GC.csv','TS_LargerNSW.csv', 'TS_Sydney.csv','TS_Aus.csv']
-# subset,outname=subsets[0],outnames[0]
-
-# second set of subsets for Kaitlyn Jan2017
-# 1. A box like the South Coast region, but with Sydney excluded (what’s the resolution of the raw product? I can give you lat/lon based on that resolution but it’ll be around -34,150,-33.5,151)
-#2. The South Coast region but only ocean cells (Jenny said that this should be easy for you to filter?)
-#3. The South Coast region but with only land cells
-#4. Like #1 but with only ocean cells
-#5. Like #1 but with only land cells
-
-
-# list of lists
-n_subs=len(subsets)
-hcho=[[] for i in range(n_subs)]
-hcho_rsc=[[] for i in range(n_subs)]
-times=[[] for i in range(n_subs)]
-counts=[[] for i in range(n_subs)]
-
-# for every day, read the averages and count the entries
-st=datetime.now()
-for day in dates:
-    try:
-        h, hc, c = read_day_avg(day, subsets)
-    except Exception as e:
-        print("WARNING: day %s file is bad?"%day.strftime("%Y%m%d"))
-        print("WARNING: Skipping this day, printing error message:")
-        print(e.message)
-        h, hc, c = (np.repeat(np.NaN,n_subs), np.repeat(np.NaN,n_subs), np.repeat(0,n_subs))
-    if day == startdate+timedelta(days=100):
-        check=(datetime.now()-st).total_seconds()
-        print("~ %3.2f seconds per 100 days"%check)
-        print("~ %4.2f minutes left..."%(check/100./60*ndays))
-        
-    ymd=day.strftime("%Y%m%d")
-    # store them in lists for each subset
-    for i in range(n_subs):
-        hcho[i].append(h[i])
-        hcho_rsc[i].append(hc[i])
-        times[i].append(ymd)
-        counts[i].append(c[i])
-
-for i, outname in enumerate(outnames):
-    print('writing %s'%outname)
-    print(times[i][0:n_subs],hcho[i][0:n_subs])
-    with open(outname, 'w') as outf:
-        writer=csv.writer(outf,quoting=csv.QUOTE_NONE)
-        writer.writerows(zip(times[i],hcho[i], hcho_rsc[i],counts[i]))
-
-
+if __name__=='__main__':
+    # Dates where we have data:
+    enddate=datetime(2016,1,1)
+    startdate=datetime(2005,1,1)
+    ndays=(enddate-startdate).days
+    dates=[startdate+timedelta(days=d) for d in range(ndays)]
+    #GEOS-Chem grid box: -36, 147.5, -32, 152.5
+    #Larger NSW region: -38, 145, -30, 153
+    #Sydney region: -35.5, 150, -33.5, 151.5
+    # Massive comparison region: -50,110,-10,160
+    
+    #subsets=[ [-36, 147.5, -32, 152.5],[-38,145,-30,153],[-35.5, 150, -33.5, 151.5] , [-50,110,-10, 160]]
+    #outnames=['TS_GC.csv','TS_LargerNSW.csv', 'TS_Sydney.csv','TS_Aus.csv']
+    # subset,outname=subsets[0],outnames[0]
+    
+    # second set of subsets for Kaitlyn Jan2017
+    # 1. A box like the South Coast region, but with Sydney excluded (what's the resolution of the raw product? I can give you lat/lon based on that resolution but it'll be around -34,150,-33.5,151)
+    # 2. The South Coast region but only ocean cells (Jenny said that this should be easy for you to filter?)
+    # 3. The South Coast region but with only land cells
+    # 4. Like #1 but with only ocean cells
+    # 5. Like #1 but with only land cells
+    
+    
+    # list of lists
+    n_subs=len(subsets)
+    hcho=[[] for i in range(n_subs)]
+    hcho_rsc=[[] for i in range(n_subs)]
+    times=[[] for i in range(n_subs)]
+    counts=[[] for i in range(n_subs)]
+    
+    # for every day, read the averages and count the entries
+    st=datetime.now()
+    for day in dates:
+        try:
+            h, hc, c = read_day_avg(day, subsets)
+        except Exception as e:
+            print("WARNING: day %s file is bad?"%day.strftime("%Y%m%d"))
+            print("WARNING: Skipping this day, printing error message:")
+            print(e.message)
+            h, hc, c = (np.repeat(np.NaN,n_subs), np.repeat(np.NaN,n_subs), np.repeat(0,n_subs))
+        if day == startdate+timedelta(days=100):
+            check=(datetime.now()-st).total_seconds()
+            print("~ %3.2f seconds per 100 days"%check)
+            print("~ %4.2f minutes left..."%(check/100./60*ndays))
+            
+        ymd=day.strftime("%Y%m%d")
+        # store them in lists for each subset
+        for i in range(n_subs):
+            hcho[i].append(h[i])
+            hcho_rsc[i].append(hc[i])
+            times[i].append(ymd)
+            counts[i].append(c[i])
+    
+    for i, outname in enumerate(outnames):
+        print('writing %s'%outname)
+        print(times[i][0:n_subs],hcho[i][0:n_subs])
+        with open(outname, 'w') as outf:
+            writer=csv.writer(outf,quoting=csv.QUOTE_NONE)
+            writer.writerows(zip(times[i],hcho[i], hcho_rsc[i],counts[i]))
+    
+    

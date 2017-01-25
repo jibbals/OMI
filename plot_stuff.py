@@ -17,6 +17,7 @@ _geofields='/HDFEOS/SWATHS/OMI Total Column Amount HCHO/Geolocation Fields/'
 _rscfield=_datafields+'ReferenceSectorCorrectedVerticalColumn'
 _vcfield =_datafields+'ColumnAmount'        
 
+
 class Swath:
     def __init__(self,hcho,lats,lons,flags,xflags,clouds):
         self.hcho=hcho
