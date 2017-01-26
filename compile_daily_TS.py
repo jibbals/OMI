@@ -178,30 +178,17 @@ def read_day_avg(day, subsets, mask_ocean=False, mask_land=False):
             out_avg[si]=hchos[si]/float(hcount[si])
             out_avg_corr[si]=hcho_rscs[si]/float(hrsccount[si])
     return (out_avg, out_avg_corr, out_counts)
-
-if __name__=='__main__':
+    
+def create_TS(subsets,outnames,mask_ocean=False,mask_land=False):
+    '''
+    Create the time series averaging pixels over each 'subset' and writing files to 'names'
+    '''
     # Dates where we have data:
     enddate=datetime(2016,1,1)
     startdate=datetime(2005,1,1)
     ndays=(enddate-startdate).days
     dates=[startdate+timedelta(days=d) for d in range(ndays)]
-    #GEOS-Chem grid box: -36, 147.5, -32, 152.5
-    #Larger NSW region: -38, 145, -30, 153
-    #Sydney region: -35.5, 150, -33.5, 151.5
-    # Massive comparison region: -50,110,-10,160
-    
-    #subsets=[ [-36, 147.5, -32, 152.5],[-38,145,-30,153],[-35.5, 150, -33.5, 151.5] , [-50,110,-10, 160]]
-    #outnames=['TS_GC.csv','TS_LargerNSW.csv', 'TS_Sydney.csv','TS_Aus.csv']
-    # subset,outname=subsets[0],outnames[0]
-    
-    # second set of subsets for Kaitlyn Jan2017
-    # 1. A box like the South Coast region, but with Sydney excluded (what's the resolution of the raw product? I can give you lat/lon based on that resolution but it'll be around -34,150,-33.5,151)
-    # 2. The South Coast region but only ocean cells (Jenny said that this should be easy for you to filter?)
-    # 3. The South Coast region but with only land cells
-    # 4. Like #1 but with only ocean cells
-    # 5. Like #1 but with only land cells
-    
-    
+           
     # list of lists
     n_subs=len(subsets)
     hcho=[[] for i in range(n_subs)]
@@ -213,7 +200,7 @@ if __name__=='__main__':
     st=datetime.now()
     for day in dates:
         try:
-            h, hc, c = read_day_avg(day, subsets)
+            h, hc, c = read_day_avg(day, subsets, mask_ocean=mask_ocean, mask_land=mask_land)
         except Exception as e:
             print("WARNING: day %s file is bad?"%day.strftime("%Y%m%d"))
             print("WARNING: Skipping this day, printing error message:")
@@ -238,5 +225,31 @@ if __name__=='__main__':
         with open(outname, 'w') as outf:
             writer=csv.writer(outf,quoting=csv.QUOTE_NONE)
             writer.writerows(zip(times[i],hcho[i], hcho_rsc[i],counts[i]))
+           
     
+if __name__=='__main__':
     
+    #GEOS-Chem grid box: -36, 147.5, -32, 152.5
+    #Larger NSW region: -38, 145, -30, 153
+    #Sydney region: -35.5, 150, -33.5, 151.5
+    # Massive comparison region: -50,110,-10,160
+    
+    #subsets=[ [-36, 147.5, -32, 152.5],[-38,145,-30,153],[-35.5, 150, -33.5, 151.5] , [-50,110,-10, 160]]
+    #outnames=['TS_GC.csv','TS_LargerNSW.csv', 'TS_Sydney.csv','TS_Aus.csv']
+    # subset,outname=subsets[0],outnames[0]
+    
+    # second set of subsets for Kaitlyn Jan2017
+    #1) Wollongong region  [34.15 , 151 , 35.5 , 150]
+    wg=[-35.5, 150, -34.15, 151]
+    #2) South Coast region (you did this one for me last time)  [33.5 , 151.5 , 35.5 , 150]
+    sc=[-35.5, 150, -33.5, 151.5]
+    #3) Wollongong region with a) just land then b) just water
+    #4) South Coast region with a) just land then b) just water
+    subsets=[ wg, sc ]
+    
+    names1=['TS_Wollongong.csv','TS_SouthCoast.csv']
+    create_TS(subsets,names1,mask_ocean=False,mask_land=False)
+    names2=['TS_Wollongong_NoOcean.csv','TS_SouthCoast_NoOcean.csv']
+    create_TS(subsets,names2,mask_ocean=True,mask_land=False)
+    names3=['TS_Wollongong_NoLand.csv','TS_SouthCoast_NoLand.csv']
+    create_TS(subsets,names3,mask_ocean=False,mask_land=True)
