@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from mpl_toolkits.basemap import maskoceans
 from glob import glob
 
-_swathesfolder="/media/jesse/My Book/jwg366/Satellite/Aura/OMI/OMHCHOSubset"
+_swathesfolder="/media/jesse/My Book/jwg366/Satellite/Aura/OMI/OMHCHOSubset/"
 #_swathesfolder="data/"
 def get_ocean_mask(lats,lons):
     '''
@@ -204,7 +204,7 @@ def create_TS(subsets,outnames,mask_ocean=False,mask_land=False):
         except Exception as e:
             print("WARNING: day %s file is bad?"%day.strftime("%Y%m%d"))
             print("WARNING: Skipping this day, printing error message:")
-            print(e.message)
+            print(e)
             h, hc, c = (np.repeat(np.NaN,n_subs), np.repeat(np.NaN,n_subs), np.repeat(0,n_subs))
         if day == startdate+timedelta(days=100):
             check=(datetime.now()-st).total_seconds()

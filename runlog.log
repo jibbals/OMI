@@ -1,0 +1,54 @@
+~ 116.89 seconds per 100 days
+~ 78.26 minutes left...
+Warning: 2006m0228 missing
+Warning: 2006m0301 missing
+Warning: 2006m0302 missing
+WARNING: day 20080129 file is bad?
+WARNING: Skipping this day, printing error message:
+"Unable to open object (Object 'referencesectorcorrectedverticalcolumn' doesn't exist)"
+WARNING: day 20080130 file is bad?
+WARNING: Skipping this day, printing error message:
+"Unable to open object (Object 'referencesectorcorrectedverticalcolumn' doesn't exist)"
+Warning: 2008m0927 missing
+Warning: 2008m0928 missing
+Warning: 2008m0929 missing
+writing TS_Wollongong.csv
+['20050101', '20050102'] [9767696600000000.0, 9076762272727272.0]
+writing TS_SouthCoast.csv
+['20050101', '20050102'] [10785714360000000.0, 12672242162162162.0]
+~ 156.23 seconds per 100 days
+~ 104.60 minutes left...
+Warning: 2006m0228 missing
+Warning: 2006m0301 missing
+Warning: 2006m0302 missing
+WARNING: day 20080129 file is bad?
+WARNING: Skipping this day, printing error message:
+"Unable to open object (Object 'referencesectorcorrectedverticalcolumn' doesn't exist)"
+WARNING: day 20080130 file is bad?
+WARNING: Skipping this day, printing error message:
+"Unable to open object (Object 'referencesectorcorrectedverticalcolumn' doesn't exist)"
+Warning: 2008m0927 missing
+Warning: 2008m0928 missing
+Warning: 2008m0929 missing
+writing TS_Wollongong_NoOcean.csv
+['20050101', '20050102'] [7619438777777778.0, 9162575000000000.0]
+writing TS_SouthCoast_NoOcean.csv
+['20050101', '20050102'] [8723664900000000.0, 14490153043478260.0]
+~ 155.81 seconds per 100 days
+~ 104.32 minutes left...
+Warning: 2006m0228 missing
+Warning: 2006m0301 missing
+Warning: 2006m0302 missing
+WARNING: day 20080129 file is bad?
+WARNING: Skipping this day, printing error message:
+"Unable to open object (Object 'referencesectorcorrectedverticalcolumn' doesn't exist)"
+WARNING: day 20080130 file is bad?
+WARNING: Skipping this day, printing error message:
+"Unable to open object (Object 'referencesectorcorrectedverticalcolumn' doesn't exist)"
+Warning: 2008m0927 missing
+Warning: 2008m0928 missing
+Warning: 2008m0929 missing
+writing TS_Wollongong_NoLand.csv
+['20050101', '20050102'] [12990083333333334.0, 8690605000000000.0]
+writing TS_SouthCoast_NoLand.csv
+['20050101', '20050102'] [12160414000000000.0, 9685674285714286.0]
