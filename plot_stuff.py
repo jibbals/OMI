@@ -340,24 +340,31 @@ def compare_to_non_subset(rsc=True, cloudy=0.4):
     plt.savefig("images/SubsetVsFull_%s"%ymdstr)
     plt.close()
 
-def plot_time_series(corrected=False):
-    outnames=['TS_Aus.csv','TS_Sydney.csv']
-    colours=['k','m']
+def plot_time_series(corrected=False, pname='time_series_check.png',days=None):
+    outnames=['TS_SouthCoast.csv','TS_SouthCoast_NoOcean.csv','TS_SouthCoast_NoLand.csv']
+    colours=['k','r','b']
+    def myplot(arr,col,lab):
+        plt.plot(arr,'.'+col)
+        print("Minimum entry:%4.2e"%np.nanmin(arr))
+        avgs=[]
+        mt=np.arange(0,len(arr),30)
+        for i in mt:
+            mean30=np.nanmean(arr[i:(i+30)])
+            avgs.append(mean30)
+        plt.plot(mt, np.array(avgs),col,label=lab)
+
     f = plt.figure(figsize=(16,14))
     for i,outcsv in enumerate(outnames):
         with open(outcsv,'r') as inf:
             reader=csv.reader(inf)
             data=list(reader)
+            if days is not None: data=data[:days]
             t = [ d[0] for d in data ] # dates
-            h = [ float(d[1]) for d in data ] # old averages
-            hcor = [ float(d[2]) for d in data ] # corrected averages
+            h = np.array([ float(d[1]) for d in data ]).astype(float) # old averages
+            hcor = np.array([ float(d[2]) for d in data ]).astype(float) # corrected averages
             c = [ int(float(d[3])) for d in data ] # how many entries averaged
-            if corrected:
-                plt.plot(hcor,'.'+colours[i], label=outcsv)
-            else:
-                plt.plot(h,'.'+colours[i], label=outcsv)
-                print("Minimum entry:%4.2e"%np.nanmin(h))
-        
+            myplot([h,hcor][corrected],colours[i],outnames[i])
+            
     plt.xlabel('Days since '+t[0])
     plt.ylabel('molecules/cm2')
     f.suptitle('Average OMI HCHO (daily Gridded V3) VC subset to three regions')
@@ -373,9 +380,9 @@ def plot_time_series(corrected=False):
         mean30=np.mean(c[i:(i+30)])
         avgs.append(mean30)
     newax.plot(np.arange(0,len(t),30), np.array(avgs),'cyan',label='Sydney good entries(30 day mean)')
-    newax.set_ylim([0,60])
+    newax.set_ylim([0,1.25*np.nanmax(np.array(avgs))])
     newax.legend(loc=1)
-    savename="images/TS_AllSubsets.png"
+    savename="images/"+pname
     print("saving %s"%savename)
     plt.savefig(savename)
     plt.close()
@@ -389,5 +396,8 @@ if __name__=="__main__":
     #negative_swath()
     #plot_25_days(rsc=True,cloudy=0.1)
     #compare_to_non_subset()
-    plot_time_series()
+    plot_time_series(False,'SouthCoastCheck.png')
+    plot_time_series(False,'SouthCoastCheck500days.png',500)
+    plot_time_series(True,'SouthCoastCheckCorrected.png')
+    
     #check_flags()
