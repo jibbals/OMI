@@ -182,7 +182,9 @@ def make_monthly_average_gridded(month):
     # GMAO FOR 0.25 x 0.3125:
     lons_m,lons_e = GMAO_lons()
     lats_m,lats_e = GMAO_lats()
-
+    
+    limits=[-50,100,-1,165] # lat,lon, lat,lon  : lower left cornter to upper right
+    
     # how many lats, lons
     ny,nx = len(lats_m), len(lons_m)
 
@@ -194,10 +196,10 @@ def make_monthly_average_gridded(month):
     
     # Just looking at subset, can skip most grid squares
     for i in range(ny):
-        if (lats_m[i] < -60) or (lats_m[i]>-1) :continue
+        if (lats_m[i] < limits[0]) or (lats_m[i]>limits[2]) :continue
         
         for j in range(nx):
-            if (lons_m[j]<50) or (lons_m[j]>170): continue
+            if (lons_m[j]< limits[1]) or (lons_m[j]>limits[3]): continue
             
             # how many pixels within this grid box
             matches=(alllats >= lats_e[i]) & (alllats < lats_e[i+1]) & (alllons >= lons_e[j]) & (alllons < lons_e[j+1])
@@ -209,7 +211,20 @@ def make_monthly_average_gridded(month):
                 VC[i,j]      = np.nanmean(allhcho[matches])
                 VCC[i,j]     = np.nanmean(allhcho_rsc[matches])
     
-    datadict={"VC":VC, "VCC":VCC, "counts":counts, "lats":alllats, "lons":alllons}
+    # subset to save space
+    loni = (lons_m > limits[1]) & (lons_m < limits[3])
+    lati = (lats_m > limits[0]) & (lats_m < limits[2])
+    counts = counts[lati,:]
+    counts = counts[:,loni]
+    VC     = VC[lati,:]
+    VC     = VC[:,loni]
+    VCC    = VCC[lati,:]
+    VCC    = VCC[:,loni]
+    lats   = lats_m[lati]
+    lons   = lons_m[loni]
+    
+    
+    datadict={"VC":VC, "VCC":VCC, "counts":counts, "lats":lats, "lons":lons}
     attrdicts = {"VC":{"desc":"Vertical column amount from OMHCHO good pixels","units":"molec/cm2"},
                  "VCC":{"desc":"reference sector corrected vertical columns from OMHCHO good pixels","units":"molec/cm2"},
                  "counts":{"desc":"count of good pixels averaged into latlon grid square"}}
@@ -219,6 +234,6 @@ def make_monthly_average_gridded(month):
     
 if __name__=='__main__':
     print("HELLO")
-    months=list_months(datetime(2005,2,1),datetime(2015,1,1))
+    months=list_months(datetime(2005,1,1),datetime(2015,12,1))
     for month in months:
         make_monthly_average_gridded(month)
