@@ -1,0 +1,224 @@
+# read hdfeos5 module
+import h5py
+
+# write averaged time series to csv
+import csv
+
+# use maths and dates, and glob for files list
+import numpy as np
+from datetime import datetime, timedelta
+from mpl_toolkits.basemap import maskoceans
+from glob import glob
+from compile_daily_TS import get_ocean_mask, read_omi_swath
+
+_swathesfolder="/media/jesse/My Book/jwg366/Satellite/Aura/OMI/OMHCHOSubset/"
+#_swathesfolder="data/"
+
+__LATRES__ = 0.25
+__LONRES__ = 0.3125
+
+def GMAO_lats(dy=__LATRES__):
+    '''
+        GMAO structure for latitudes (half spaced top and bottom)
+        returns lats_mids, lats_edges
+        mids are [-90+dy/4, -90+dy/4+dy, -90+dy/4+2dy, ...]
+        edges are [-90, -90+dy/2, -90+dy/2 + dy, -90+dy/2+2dy, ...]
+    '''
+    ny=int(180/dy) # how many latitudes
+    late=np.ndarray(ny+2)
+    #edges of latitude bounds
+    late[0]=-90
+    late[-1]=90
+    # the rest is regular from half spaced polar boxes
+    late[1:-1] = np.linspace(-90+dy/2.0, 90-dy/2.0, ny)
+
+    # Latitude midpoints
+    latm=(late[0:-1]+late[1:]) / 2.0
+    return latm,late
+
+def GMAO_lons(dx=__LONRES__):
+    '''
+        GMAO structured longitudes (this one is regularly spaced)
+        returns lons_mids, lons_edges
+        mids are [-180, -180+dx, ...]
+    '''
+    nx=int(360/dx) # how many lons
+    lone=np.linspace(-180-dx/2.0, 180-dx/2.0, nx+1)
+    lonm=(lone[0:-1]+lone[1:]) / 2.0
+
+    return lonm, lone
+
+def list_days(day0,dayn=None):
+    '''
+        return list of days from day0 to dayn, or just day0
+        if month is True, return [day0,...,end_of_month]
+    '''
+    if dayn is None: return [day0,]
+    day0 = datetime(day0.year,day0.month,day0.day)
+    dayn = datetime(dayn.year,dayn.month,dayn.day)
+    numdays = (dayn-day0).days + 1 # timedelta
+    return [day0 + timedelta(days=x) for x in range(0, numdays)]
+
+
+def list_months(day0,dayn):
+    '''
+        Return list of months (day=1) included between day0 and dayN
+    '''
+    # first get list of days
+    days=list_days(day0,dayn)
+    # Just pull out entries with day==1
+    months=[d for d in days if d.day==1]
+    return months
+
+def save_to_hdf5(outfilename, arraydict, fillvalue=np.NaN,
+                 attrdicts={}, fattrs={},
+                 verbose=False):
+    '''
+        Takes a bunch of arrays, named in the arraydict parameter, and saves
+        to outfilename as hdf5 using h5py (with fillvalue specified), and gzip compression
+
+        INPUTS:
+            outfilename: name of file to save
+            arraydict: named arrays of data to save using given fillvalue and attributes
+            attrdicts is an optional dictionary of dictionaries,
+                keys should match arraydict, values should be dicts of attributes
+            fattrs: extra file level attributes
+    '''
+    print("saving "+outfilename)
+    with h5py.File(outfilename,"w") as f:
+        if verbose:
+            print("Inside fio.save_to_hdf5()")
+            print(arraydict.keys())
+
+        # attribute creation
+        # give the HDF5 root some more attributes
+        f.attrs['Filename']        = outfilename.split('/')[-1]
+        f.attrs['creator']          = 'Jesse Greenslade'
+        f.attrs['HDF5_Version']     = h5py.version.hdf5_version
+        f.attrs['h5py_version']     = h5py.version.version
+        f.attrs['Fill_Value']       = fillvalue
+        # optional extra file attributes from argument
+        for key in fattrs.keys():
+            if verbose:
+                print(key,fattrs[key], type(fattrs[key]))
+            f.attrs[key] = fattrs[key]
+
+
+        for name in arraydict.keys():
+            # create dataset, using arraydict values
+            darr=np.array(arraydict[name])
+            if verbose:
+                print((name, darr.shape, darr.dtype))
+
+            # handle datetime type and boolean types
+            # turn boolean into int8
+            if darr.dtype == np.dtype('bool'):
+                darr=np.int8(darr)
+                attrdicts={}
+                if not name in attrdicts:
+                    attrdicts[name]={}
+                attrdicts[name]['conversion']={'from':'boolean','to':'int8','by':'fio.save_to_hdf5()'}
+            # harder to test for datetime type...
+
+            # Fill array using darr,
+            #
+            dset=f.create_dataset(name,fillvalue=fillvalue,
+                                  data=darr, compression_opts=9,
+                                  chunks=True, compression="gzip")
+            # for VC items and RSC, note the units in the file.
+            if name in attrdicts:
+                for attrk, attrv in attrdicts[name].items():
+                    dset.attrs[attrk]=attrv
+
+        # force h5py to flush buffers to disk
+        f.flush()
+    print("Saved "+outfilename)
+
+def make_monthly_average_gridded(month):
+    '''
+    Read the average HCHO from a days worth of swathes
+    molecules/cm2
+    save monthly averaged HCHO, HCHO_Corrected, pixel counts with dims: [lats, lons]
+    '''
+    YYYYmMM=month.strftime("%Ym%m")
+    outfilename="data/gridded_monthly_%s.he5"%YYYYmMM
+    # files look like this:
+    #  OMI-Aura_L2-OMHCHO_2009m1230t0156-o29035_v003-2014m0626t164117.SUB.he5
+    pattern="*OMHCHO_%s*"%YYYYmMM
+    swaths=glob(_swathesfolder+pattern)
+    # if no swaths!?
+    assert len(swaths) > 0, "ERROR: %s missing"%YYYYmMM
+    
+    print("reading %d swaths like %s"%(len(swaths),pattern))
+    # for each swath, grab the entries within our lat/lon bounds
+    allhcho=None
+    allhcho_rsc=None
+    alllats=None
+    alllons=None
+    
+    for fpath in swaths:
+        swath=read_omi_swath(fpath,mask_ocean=False, mask_land=False)
+        # rows x sensors
+        # I x 60
+        hcho=swath['HCHO']
+        hcho_rsc=swath['HCHO_rsc']
+        lats, lons = swath['lats'], swath['lons']
+        
+        # read in whole month to one array
+        if allhcho is None:
+            allhcho=hcho
+            allhcho_rsc=hcho_rsc
+            alllats=lats
+            alllons=lons
+        else:
+            allhcho=np.append(allhcho, hcho, axis=0)
+            allhcho_rsc=np.append(allhcho_rsc, hcho_rsc, axis=0)
+            alllats=np.append(alllats, lats, axis=0)
+            alllons=np.append(alllons, lons, axis=0)
+        del swath
+    
+    
+    ## GRID INTO LATS/LONS BINS:
+    # GMAO FOR 0.25 x 0.3125:
+    lons_m,lons_e = GMAO_lons()
+    lats_m,lats_e = GMAO_lats()
+
+    # how many lats, lons
+    ny,nx = len(lats_m), len(lons_m)
+
+
+    # Skip all this if there is no omhcho data on this day
+    VC = np.ndarray([ny, nx])+np.NaN # Vertical columns 
+    VCC = np.ndarray([ny, nx])+np.NaN # corrected
+    counts = np.zeros([ny, nx]) # pixel counts
+    
+    # Just looking at subset, can skip most grid squares
+    for i in range(ny):
+        if (lats_m[i] < -60) or (lats_m[i]>-1) :continue
+        
+        for j in range(nx):
+            if (lons_m[j]<50) or (lons_m[j]>170): continue
+            
+            # how many pixels within this grid box
+            matches=(alllats >= lats_e[i]) & (alllats < lats_e[i+1]) & (alllons >= lons_e[j]) & (alllons < lons_e[j+1])
+            
+            counts[i,j]= np.sum(matches)
+            
+            # Save the means of each good grid pixel
+            if counts[i,j] > 0:
+                VC[i,j]      = np.nanmean(allhcho[matches])
+                VCC[i,j]     = np.nanmean(allhcho_rsc[matches])
+    
+    datadict={"VC":VC, "VCC":VCC, "counts":counts, "lats":alllats, "lons":alllons}
+    attrdicts = {"VC":{"desc":"Vertical column amount from OMHCHO good pixels","units":"molec/cm2"},
+                 "VCC":{"desc":"reference sector corrected vertical columns from OMHCHO good pixels","units":"molec/cm2"},
+                 "counts":{"desc":"count of good pixels averaged into latlon grid square"}}
+    save_to_hdf5(outfilename,arraydict=datadict,attrdicts=attrdicts)
+    
+           
+    
+if __name__=='__main__':
+    print("HELLO")
+    months=list_months(datetime(2005,2,1),datetime(2015,1,1))
+    for month in months:
+        make_monthly_average_gridded(month)
