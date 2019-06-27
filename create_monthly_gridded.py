@@ -1,5 +1,7 @@
 # read hdfeos5 module
 import h5py
+import h5netcdf # Write netcdf output
+
 
 # write averaged time series to csv
 import csv
@@ -157,7 +159,12 @@ def make_monthly_average_gridded(month):
     alllons=None
     
     for fpath in swaths:
-        swath=read_omi_swath(fpath,mask_ocean=False, mask_land=False)
+        try:
+            swath=read_omi_swath(fpath,mask_ocean=False, mask_land=False)
+        except KeyError as KE:
+            print(KE)
+            print("Continuing without this swath")
+            continue
         # rows x sensors
         # I x 60
         hcho=swath['HCHO']
@@ -228,12 +235,105 @@ def make_monthly_average_gridded(month):
     attrdicts = {"VC":{"desc":"Vertical column amount from OMHCHO good pixels","units":"molec/cm2"},
                  "VCC":{"desc":"reference sector corrected vertical columns from OMHCHO good pixels","units":"molec/cm2"},
                  "counts":{"desc":"count of good pixels averaged into latlon grid square"}}
-    save_to_hdf5(outfilename,arraydict=datadict,attrdicts=attrdicts)
+    save_to_hdf5(outfilename, arraydict=datadict, attrdicts=attrdicts)
     
-           
+def gregorian_from_dates(dates):
+    ''' gregorian array from datetime list
+        gregorian is hours since 1985,1,1,0,0
+
+    '''
+    d0=datetime(1985,1,1,0,0,0)
+    return np.array([(date-d0).total_seconds()/3600.0 for date in dates ])
+
+def read_hdf5(filename):
+    '''
+        Should be able to read hdf5 files created by my method above...
+        Returns data dictionary and attributes dictionary
+    '''
+    retstruct={}
+    retattrs={}
+    with h5py.File(filename,'r') as in_f:
+        #print('reading from file '+filename)
+
+        # READ DATA AND ATTRIBUTES:
+        for key in in_f.keys():
+        #    if __VERBOSE__: print(key)
+            retstruct[key]=in_f[key].value
+            attrs=in_f[key].attrs
+            retattrs[key]={}
+            # print the attributes
+            for akey,val in attrs.items():
+        #        if __VERBOSE__: print("reading %s(attr)   %s:%s"%(key,akey,val))
+                retattrs[key][akey]=val
+
+        # ADD FILE ATTRIBUTES TO ATTRS
+        retattrs['file']={}
+        for fkey in in_f.attrs.keys():
+            retattrs['file'][fkey] = in_f.attrs[fkey]
+
+    return retstruct, retattrs
     
+def convert_to_netcdf():
+    '''
+        Read all the he5 data, output as [lon, lat, time(REC)] netcdf file.
+    '''
+    months = list_months(datetime(2005,1,1), datetime(2015,12,1))
+    data,attrs = read_hdf5('data/gridded_monthly_2005m01.he5')
+    lats=data['lats']
+    lons=data['lons']
+    z       = gregorian_from_dates(months)
+    VC      = np.zeros([len(lons),len(lats),len(z)])
+    VCC     = np.zeros([len(lons),len(lats),len(z)])
+    counts  = np.zeros([len(lons),len(lats),len(z)])
+    
+    
+    
+    # Save whole gridded product
+    VC[:,:,0]       =np.transpose(data['VC'])
+    VCC[:,:,0]      =np.transpose(data['VCC'])
+    counts[:,:,0]   =np.transpose(data['counts'])
+    for i,month in enumerate(months[1:]):
+        data,attrs = read_hdf5(month.strftime('data/gridded_monthly_%Ym%m.he5'))
+        VC[:,:,i]=np.transpose(data['VC'])
+        VCC[:,:,i]=np.transpose(data['VCC'])
+        counts[:,:,i]=np.transpose(data['counts'])
+        
+        
+    
+    # WRITE TO NETCDF FILE:
+    with h5netcdf.File('GriddedColumns.nc', 'w') as f:
+        # set dimensions with a dictionary
+        f.dimensions = {'lon':len(lons),'lat':len(lats), 'time':len(z)} # month should be unlimited, not sure how to do that
+        # and update them with a dict-like interface
+        # f.dimensions['x'] = 5
+        # f.dimensions.update({'x': 5})
+    
+        var1 = f.create_variable('VC', ('lon','lat','time',), data=VC)
+        var2 = f.create_variable('VCC', ('lon','lat','time',), data=VCC)
+        var3 = f.create_variable('counts', ('lon','lat','time',), data=counts)
+        dim1 = f.create_variable('lons', ('lon',), data=lons)
+        dim2 = f.create_variable('lats', ('lat',), data=lats)
+        dim3 = f.create_variable('times', ('time',), data=z)
+        
+        # access and modify attributes with a dict-like interface
+        for k,v in attrs['VC'].items():
+            var1.attrs[k] = v
+        for k,v in attrs['VCC'].items():
+            var2.attrs[k] = v
+        for k,v in attrs['counts'].items():
+            var3.attrs[k] = v
+        dim3.attrs['desc'] = 'Gregorian dates, hours since 1985 01 01 00:00:00'
+        
 if __name__=='__main__':
     print("HELLO")
-    months=list_months(datetime(2005,1,1),datetime(2015,12,1))
-    for month in months:
-        make_monthly_average_gridded(month)
+    months=list_months(datetime(2015,1,1),datetime(2015,12,1))
+    #for month in months:
+    #    start=datetime.now()
+    #    make_monthly_average_gridded(month)
+    #    check=(datetime.now()-start).total_seconds()
+    #    print("~ %3.2f minutes for month"%(check/60.0))
+    
+    convert_to_netcdf()
+    
+        
+        
