@@ -201,6 +201,9 @@ def make_monthly_average_gridded(month):
     VCC = np.ndarray([ny, nx])+np.NaN # corrected
     counts = np.zeros([ny, nx]) # pixel counts
     
+    ## TODO: FASTER WAY USING
+    ## from scipy.stats import binned_statistic_2d
+    ## no2_gridded = binned_statistic_2d(alllons, alllats, allno2, bins=[outlon_e,outlat_e],statistic=‘mean’).statistic
     # Just looking at subset, can skip most grid squares
     for i in range(ny):
         if (lats_m[i] < limits[0]) or (lats_m[i]>limits[2]) :continue
